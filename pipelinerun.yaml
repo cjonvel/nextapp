@@ -4,6 +4,7 @@ kind: PipelineRun
 metadata:
   generateName: pipelinerun-nextapp-
 spec:
+  serviceAccountName: build-bot
   params:
     - name: source-repo
       value: https://github.com/cjonvel/nextapp.git
