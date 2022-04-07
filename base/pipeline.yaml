@@ -58,3 +58,20 @@ spec:
       workspaces:
         - name: source
           workspace: pipeline-shared-data
+    - name: manifest
+      params:
+        - name: app-name
+          value: "$(params.app-name)"
+        - name: source-repo
+          value: "$(params.source-repo)"
+        - name: commit
+          value: "$(tasks.clone-repository.results.commit)"
+        - name: image-repo
+          value: "$(params.image-repo)"
+      runAfter:
+        - create-image
+      taskRef:
+        name: manifest
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data

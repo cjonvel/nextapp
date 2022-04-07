@@ -6,6 +6,8 @@ metadata:
 spec:
   serviceAccountName: build-bot
   params:
+    - name: app-name
+      value: nextapp
     - name: source-repo
       value: https://github.com/cjonvel/nextapp.git
     - name: image-repo
