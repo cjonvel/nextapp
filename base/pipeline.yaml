@@ -4,6 +4,9 @@ metadata:
   name: pipeline-nextapp
 spec:
   params:
+    - name: app-name
+      type: string
+      description: Application name
     - name: source-repo
       type: string
       description: Source code repository
