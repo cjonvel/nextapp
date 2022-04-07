@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pipeline-nextapp
+spec:
+  params:
+    - name: source-repo
+      type: string
+      description: Source code repository
+    - name: image-repo
+      type: string
+      description: Docker image repository
+  workspaces:
+    - name: pipeline-shared-data
+  tasks:
+    - name: clone-repository
+      params:
+        - name: url
+          value: "$(params.source-repo)"
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: pipeline-shared-data
+    - name: print-readme
+      runAfter:
+        - clone-repository
+      taskRef:
+        name: print-readme
+        kind: Task
+      workspaces:
+        - name: dir-with-readme
+          workspace: pipeline-shared-data
+    - name: run-tests
+      params:
+        - name: ARGS
+          value:
+            - install-ci-test
+      runAfter:
+        - print-readme
+      taskRef:
+        name: npm
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+    - name: create-image
+      params:
+        - name: IMAGE
+          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"
+        - name: TLSVERIFY
+          value: "false"
+      runAfter:
+        - run-tests
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data

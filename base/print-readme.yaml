@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: print-readme
+spec:
+  steps:
+    - name: print
+      image: quay.io/ibmgaragecloud/alpine-curl
+      script: |
+        cat /workspace/dir-with-readme/README.md
+  workspaces:
+    - name: dir-with-readme
+

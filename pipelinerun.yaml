@@ -1,0 +1,23 @@
+
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: pipelinerun-nextapp-
+spec:
+  params:
+    - name: source-repo
+      value: https://github.com/cjonvel/nextapp.git
+    - name: image-repo
+      value: quay.io/cjonvel/nextapp
+  pipelineRef:
+    name: pipeline-nextapp
+  workspaces:
+    - name: pipeline-shared-data
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 1Gi
+          accessModes:
+            - ReadWriteOnce
+
