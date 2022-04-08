@@ -75,6 +75,9 @@ spec:
         - create-image
       taskRef:
         name: manifest
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
     - name: deploy
       params:
         - name: manifest
@@ -83,6 +86,8 @@ spec:
           value: "$(context.pipelineRun.namespace)"
       runAfter:
         - manifest
+      taskRef:
+        name: deploy
       workspaces:
         - name: source
           workspace: pipeline-shared-data

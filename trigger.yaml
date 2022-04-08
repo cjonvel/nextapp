@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: listener-trigger
+--- 
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: listener-trigger
+rules:
+  - apiGroups:
+      - triggers.tekton.dev
+    resources:
+      - eventlisteners
+      - triggerbindings
+      - triggertemplates
+    verbs:
+      - get
+  - apiGroups:
+      - tekton.dev
+    resources:
+      - pipelineruns
+      - pipelineresources
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - list
+--- 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: listener-trigger
+subjects:
+  - kind: ServiceAccount
+    name: listener-trigger
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: listener-trigger
+--- 
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: listener-trigger
+spec:
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName:  pipelinerun-nextapp-
+      spec:
+        serviceAccountName: pipeline
+        pipelineRef:
+          name: pipeline-nextapp
+        params:
+          - name: app-name
+            value: nextapp
+          - name: source-repo
+            value: https://github.om/cjonvel/nextapp
+          - name: image-repo
+            value: quay.io/cjonvel/nextapp
+        workspaces:
+          - name: pipeline-shared-data
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+--- 
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: listener-trigger
+--- 
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: listener-trigger
+spec:
+  serviceAccountName: listener-trigger
+  triggers:
+    - bindings:
+        - ref: listener-trigger
+      template:
+        name: listener-trigger
+--- 
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: listener-trigger
+spec:
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: el-listener-trigger
+    weight: 100
+--- 
