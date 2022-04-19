@@ -1,4 +1,4 @@
-FROM quay.io/upslopeio/node-alpine  as deps
+FROM quay.io/upslopeio/node-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json ./

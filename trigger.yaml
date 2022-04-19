@@ -53,14 +53,14 @@ spec:
       metadata:
         generateName:  pipelinerun-nextapp-
       spec:
-        serviceAccountName: pipeline
+        serviceAccountName: build-bot
         pipelineRef:
           name: pipeline-nextapp
         params:
           - name: app-name
             value: nextapp
           - name: source-repo
-            value: https://github.om/cjonvel/nextapp
+            value: https://github.com/cjonvel/nextapp
           - name: image-repo
             value: quay.io/cjonvel/nextapp
         workspaces:
@@ -101,4 +101,3 @@ spec:
     kind: Service
     name: el-listener-trigger
     weight: 100
---- 
