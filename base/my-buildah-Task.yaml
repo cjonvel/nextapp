@@ -2,8 +2,6 @@
 # DO NOT EDIT: use the script instead
 # source: https://raw.githubusercontent.com/openshift/tektoncd-catalog/release-v0.16/task/buildah/0.1/buildah.yaml
 #
----
----
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
