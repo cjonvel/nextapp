@@ -1,0 +1,64 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: nextapp-gitops
+spec:
+  serviceAccountName: pipeline
+  bindings:
+    - ref: nextapp-gitops
+  template:
+    ref: nextapp-gitops
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: nextapp-gitops
+spec:
+  params:
+  - name: git-repo-url
+    value: $(body.repository.ssh_url)
+  - name: git-repo-name
+    value: $(body.repository.name)
+  - name: git-revision
+    value: $(body.head_commit.id)
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: nextapp-gitops
+spec:
+  params:
+  - name: git-repo-url
+    description: The git repository url
+  - name: git-revision
+    description: The git revision
+    default: main
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: nextapp-gitops-
+    spec:
+      serviceAccountName: pipeline
+      pipelineRef:
+        name: nextapp-gitops
+      params:
+      - name: GIT_CODE_REPO
+        value: $(tt.params.git-repo-url)
+      - name: GIT_CODE_REVISION
+        value: $(tt.params.git-revision)
+      - name: GIT_USER_NAME
+        value: pipeline
+      - name: GIT_USER_EMAIL
+        value: pipeline@localhost
+      - name: IMAGE_NAME
+        value: de.icr.io/lab-registry/cjonvel-nextapp
+      - name: GIT_CONFIG_REPO
+        value: git@github.com:cjonvel/cjonvel-nextapp-config.git
+      workspaces:
+      - name: pipeline-shared-data
+        persistentVolumeClaim:
+          claimName: nextapp-pipeline
+      - name: github-credentials
+        secret:
+          secretName: github-credentials

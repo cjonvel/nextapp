@@ -10,7 +10,7 @@ spec:
     - name: source-repo
       type: string
       description: Source code repository
-    - name: image-repo
+    - name: image-registry
       type: string
       description: Docker image repository
   workspaces:
@@ -21,8 +21,8 @@ spec:
         - name: url
           value: "$(params.source-repo)"
       taskRef:
-        name: git-clone
-        kind: ClusterTask
+        name: git-clone-v0-16-3
+        kind: Task
       workspaces:
         - name: output
           workspace: pipeline-shared-data
@@ -50,7 +50,7 @@ spec:
     - name: create-image
       params:
         - name: IMAGE
-          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"
+          value: "$(params.image-registry):$(tasks.clone-repository.results.commit)"
         - name: TLSVERIFY
           value: "false"
       runAfter:
@@ -69,8 +69,8 @@ spec:
           value: "$(params.source-repo)"
         - name: commit
           value: "$(tasks.clone-repository.results.commit)"
-        - name: image-repo
-          value: "$(params.image-repo)"
+        - name: image-registry
+          value: "$(params.image-registry)"
       runAfter:
         - create-image
       taskRef:

@@ -18,7 +18,7 @@ spec:
         #!/bin/sh
         set -e
 
-        kubectl apply -n $(params.app-namespace) -f ./source/$(params.manifest)
+        kubectl apply -n $(params.app-namespace) -f workspace/source/$(params.manifest)
     - name: verify-deploy
       image: quay.io/upslopeio/kubectl:latest
       script: |
@@ -40,7 +40,7 @@ spec:
            exit 1
         fi
 
-        DEPLOYMENT_NAME=$(yq eval 'select(.kind == "Deployment").metadata.name' "./source/$MANIFEST" )
+        DEPLOYMENT_NAME=$(yq eval 'select(.kind == "Deployment").metadata.name' "workspace/source/$MANIFEST" )
 
         if [[ -z "${DEPLOYMENT_NAME}" ]]; then
            echo "Unable to determine deployment name"

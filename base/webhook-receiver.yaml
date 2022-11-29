@@ -6,6 +6,6 @@ spec:
   serviceAccountName: webhook-receiver
   triggers:
     - template:
-        name: webhook-receiver
+        ref: nextapp-gitops
       bindings:
-        - ref: webhook-receiver
+      - ref: nextapp-gitops

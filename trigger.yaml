@@ -1,21 +1,24 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: listener-trigger
---- 
+  name: webhook-receiver
+---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: listener-trigger
+  name: webhook-receiver
 rules:
   - apiGroups:
       - triggers.tekton.dev
     resources:
       - eventlisteners
+      - triggers
       - triggerbindings
       - triggertemplates
     verbs:
       - get
+      - list
+      - watch
   - apiGroups:
       - tekton.dev
     resources:
@@ -23,81 +26,89 @@ rules:
       - pipelineresources
     verbs:
       - create
+      - list
   - apiGroups:
       - ""
     resources:
       - configmaps
     verbs:
       - list
---- 
+      - get
+      - watch
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: listener-trigger
+  name: webhook-receiver
 subjects:
   - kind: ServiceAccount
-    name: listener-trigger
+    name: webhook-receiver
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: listener-trigger
---- 
+  name: webhook-receiver
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aggregate-olm-edit-tekton-jonvel   # To be changed
+subjects:
+  - kind: ServiceAccount
+    name: webhook-receiver
+    namespace: lab-jonvel   # To be changed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aggregate-olm-edit-tekton
+---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
-  name: listener-trigger
+  name: webhook-receiver
 spec:
+  params:
+    - name: source-repo
+      description: source repository ssh url injected from TriggerBinding
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
         generateName:  pipelinerun-nextapp-
       spec:
-        serviceAccountName: build-bot
+        serviceAccountName: pipeline
         pipelineRef:
           name: pipeline-nextapp
         params:
           - name: app-name
             value: nextapp
           - name: source-repo
-            value: https://github.com/cjonvel/nextapp
-          - name: image-repo
-            value: quay.io/cjonvel/nextapp
+            value:  $(tt.params.source-repo)    #  Will be filled by git event thanks to TriggerBinding mapping
+          - name: image-registry
+            value: de.icr.io/lab-registry/cjonvel-nextapp   # To be changed
         workspaces:
           - name: pipeline-shared-data
-            volumeClaimTemplate:
-              spec:
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 1Gi
---- 
+            persistentVolumeClaim:
+              claimName: nextapp-pipeline    # this PVC must already exist
+---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
 metadata:
-  name: listener-trigger
---- 
-apiVersion: triggers.tekton.dev/v1alpha1
-kind: EventListener
-metadata:
-  name: listener-trigger
+  name: webhook-receiver
 spec:
-  serviceAccountName: listener-trigger
-  triggers:
-    - bindings:
-        - ref: listener-trigger
-      template:
-        name: listener-trigger
---- 
+  params:
+    - name: source-repo
+      value: $(body.repository.ssh_url)
+---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: listener-trigger
+  name: webhook-receiver
 spec:
-  port:
-    targetPort: 8080
   to:
     kind: Service
-    name: el-listener-trigger
+    name: el-webhook-receiver
     weight: 100
+  port:
+    targetPort: http-listener
+  wildcardPolicy: None
+---

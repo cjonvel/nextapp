@@ -3,14 +3,14 @@ kind: PipelineRun
 metadata:
   generateName: pipelinerun-nextapp-
 spec:
-  serviceAccountName: build-bot
+  serviceAccountName: pipeline
   params:
+    - name: source-repo
+      value: git@github.com:cjonvel/cjonvel-nextapp.git 
+    - name: image-registry
+      value: de.icr.io/lab-registry/cjonvel-nextapp
     - name: app-name
       value: nextapp
-    - name: source-repo
-      value: git@github.ibm.com:coralie-jonvel/nextapp.git 
-    - name: image-repo
-      value: quay.io/cjonvel/nextapp
   pipelineRef:
     name: pipeline-nextapp
   workspaces:

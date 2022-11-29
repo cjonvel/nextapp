@@ -1,0 +1,115 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: nextapp-gitops
+spec:
+  params:
+    - name: IMAGE_NAME
+      type: string
+    - name: GIT_CODE_REPO
+      type: string
+    - name: GIT_CODE_REVISION
+      type: string
+    - name: GIT_CONFIG_REPO
+      type: string
+    - name: GIT_USER_NAME
+      type: string
+    - name: GIT_USER_EMAIL
+      type: string
+  workspaces:
+    - name: pipeline-shared-data
+    - name: github-credentials
+  tasks:
+    - name: fetch-code-repository
+      taskRef:
+        name: git-clone-v0-16-3
+        kind: Task
+      workspaces:
+        - name: output
+          workspace: pipeline-shared-data
+      params:
+        - name: url
+          value: $(params.GIT_CODE_REPO)
+        - name: revision
+          value: $(params.GIT_CODE_REVISION)
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+
+    - name: build-push
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      runAfter:
+        - fetch-code-repository
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+      params:
+        - name: IMAGE
+          value: $(params.IMAGE_NAME):$(tasks.fetch-code-repository.results.commit)
+        - name: TLSVERIFY
+          value: "false"
+
+    - name: fetch-config-repository
+      taskRef:
+        name: git-clone-v0-16-3
+        kind: Task
+      runAfter:
+        - build-push
+      workspaces:
+        - name: output
+          workspace: pipeline-shared-data
+      params:
+        - name: url
+          value: $(params.GIT_CONFIG_REPO)
+        - name: revision
+          value: main
+        - name: deleteExisting
+          value: "true"
+
+    - name: update-manifests
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      runAfter:
+        - fetch-config-repository
+      workspaces:
+        - name: manifest-dir
+          workspace: pipeline-shared-data
+      params:
+      - name: SCRIPT
+        value: |
+          oc patch --type merge --local -o yaml -f /workspace/manifest-dir/base/kustomization.yaml \
+            -p "images:
+                  - name: image-name-placeholder
+                    newName: $(params.IMAGE_NAME):$(tasks.fetch-code-repository.results.commit)" \
+            > kustomization.yaml
+            mv kustomization.yaml /workspace/manifest-dir/base/kustomization.yaml
+          echo 'Patched kustomization.yaml'
+    - name: commit-push
+      taskRef:
+        name: git-cli
+        kind: Task
+      runAfter:
+        - update-manifests
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+        - name: ssh-directory
+          workspace: github-credentials
+      params:
+      - name: GIT_USER_NAME
+        value: $(params.GIT_USER_NAME)
+      - name: GIT_USER_EMAIL
+        value: $(params.GIT_USER_EMAIL)
+      - name: GIT_SCRIPT
+        value: |
+          cp /root/.ssh/ssh-directory/ssh-privatekey /root/.ssh/id_rsa
+          ssh-keyscan -t rsa github.com > /root/.ssh/known_hosts
+          cd /workspace/source
+          git checkout main
+          git add base/kustomization.yaml
+          git commit -m "Container image update"
+          git push
