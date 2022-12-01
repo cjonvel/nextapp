@@ -10,19 +10,30 @@ spec:
     - name: source-repo
       type: string
       description: Source code repository
+    - name: source-repo-branch
+      type: string
+      description: Source code repository branch or revision
     - name: image-registry
       type: string
       description: Docker image repository
+    - name: GIT_CONFIG_REPO
+      type: string
+    - name: GIT_USER_NAME
+      type: string
+    - name: GIT_USER_EMAIL
+      type: string
   workspaces:
     - name: pipeline-shared-data
+    - name: github-credentials
   tasks:
     - name: clone-repository
       params:
         - name: url
           value: "$(params.source-repo)"
+        - name: revision
+          value: "$(params.source-repo-branch)"
       taskRef:
-        name: git-clone-v0-16-3
-        kind: Task
+        name: git-clone
       workspaces:
         - name: output
           workspace: pipeline-shared-data
@@ -31,7 +42,6 @@ spec:
         - clone-repository
       taskRef:
         name: print-readme
-        kind: Task
       workspaces:
         - name: dir-with-readme
           workspace: pipeline-shared-data
@@ -53,41 +63,71 @@ spec:
           value: "$(params.image-registry):$(tasks.clone-repository.results.commit)"
         - name: TLSVERIFY
           value: "false"
+        - name: STORAGE_DRIVER
+          value: vfs
       runAfter:
         - run-tests
       taskRef:
-        name: my-buildah
-        kind: Task
+        name: buildah
       workspaces:
         - name: source
           workspace: pipeline-shared-data
-    - name: manifest
-      params:
-        - name: app-name
-          value: "$(params.app-name)"
-        - name: source-repo
-          value: "$(params.source-repo)"
-        - name: commit
-          value: "$(tasks.clone-repository.results.commit)"
-        - name: image-registry
-          value: "$(params.image-registry)"
+
+    - name: fetch-config-repository
+      taskRef:
+        name: git-clone
       runAfter:
         - create-image
-      taskRef:
-        name: manifest
       workspaces:
-        - name: source
+        - name: output
           workspace: pipeline-shared-data
-    - name: deploy
       params:
-        - name: manifest
-          value: "$(tasks.manifest.results.manifest)"
-        - name: app-namespace
-          value: "$(context.pipelineRun.namespace)"
-      runAfter:
-        - manifest
+        - name: url
+          value: $(params.GIT_CONFIG_REPO)
+        - name: revision
+          value: main
+        - name: deleteExisting
+          value: "true"
+    - name: update-manifests
       taskRef:
-        name: deploy
+        name: openshift-client
+      runAfter:
+        - fetch-config-repository
+      workspaces:
+        - name: manifest-dir
+          workspace: pipeline-shared-data
+      params:
+      - name: SCRIPT
+        value: |
+          oc patch --type merge --local -o yaml -f /workspace/manifest-dir/base/kustomization.yaml \
+            -p "images:
+                  - name: image-name-placeholder
+                    newName: $(params.image-registry):$(tasks.clone-repository.results.commit)" \
+            > kustomization.yaml
+            mv kustomization.yaml /workspace/manifest-dir/base/kustomization.yaml
+          echo 'Patched kustomization.yaml'
+
+    - name: commit-push
+      taskRef:
+        name: git-cli
+      runAfter:
+        - update-manifests
       workspaces:
         - name: source
           workspace: pipeline-shared-data
+        - name: ssh-directory
+          workspace: github-credentials
+      params:
+      - name: GIT_USER_NAME
+        value: $(params.GIT_USER_NAME)
+      - name: GIT_USER_EMAIL
+        value: $(params.GIT_USER_EMAIL)
+      - name: GIT_SCRIPT
+        value: |
+          cp /root/.ssh/ssh-directory/ssh-privatekey /root/.ssh/id_rsa
+          ssh-keyscan -t rsa github.com > /root/.ssh/known_hosts
+          cd /workspace/source
+          git checkout main
+          git add base/kustomization.yaml
+          git commit -m "Container image update"
+          git push

@@ -3,75 +3,11 @@ kind: EventListener
 metadata:
   name: webhook-receiver
 spec:
-  serviceAccountName: webhook-receiver
   triggers:
     - template:
         ref: webhook-receiver
       bindings:
       - ref: webhook-receiver
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: webhook-receiver
----
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: webhook-receiver
-rules:
-  - apiGroups:
-      - triggers.tekton.dev
-    resources:
-      - eventlisteners
-      - triggers
-      - triggerbindings
-      - triggertemplates
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - tekton.dev
-    resources:
-      - pipelineruns
-      - pipelineresources
-    verbs:
-      - create
-      - list
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-    verbs:
-      - list
-      - get
-      - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: webhook-receiver
-subjects:
-  - kind: ServiceAccount
-    name: webhook-receiver
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: webhook-receiver
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: aggregate-olm-edit-tekton-jonvel   # To be changed
-subjects:
-  - kind: ServiceAccount
-    name: webhook-receiver
-    namespace: lab-jonvel   # To be changed
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: aggregate-olm-edit-tekton
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
@@ -81,13 +17,23 @@ spec:
   params:
     - name: source-repo
       description: source repository ssh url injected from TriggerBinding
+    - name: image-registry
+      description: docker image path in container registry
+    - name: source-repo-branch
+      description: source repository branch injected from TriggerBinding
+    - name: one-pipeline-dockerconfigjson
+      description: dockerconfig for registry
+    - name: git-ssh-key
+      description: to access github
+    - name: git-config-repo
+      description: where to put kustomization files
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
         generateName:  pipelinerun-nextapp-
       spec:
-        serviceAccountName: pipeline
+        serviceAccountName: build-bot
         pipelineRef:
           name: pipeline-nextapp
         params:
@@ -95,12 +41,46 @@ spec:
             value: nextapp
           - name: source-repo
             value:  $(tt.params.source-repo)    #  Will be filled by git event thanks to TriggerBinding mapping
+          - name: source-repo-branch
+            value:  $(tt.params.source-repo-branch)    #  Will be filled by git event thanks to TriggerBinding mapping
           - name: image-registry
-            value: de.icr.io/lab-registry/cjonvel-nextapp   # To be changed
+            value: $(tt.params.image-registry)   # To be changed
+          - name: GIT_CONFIG_REPO
+            value: $(tt.params.git-config-repo)  # To be changed
+          - name: GIT_USER_NAME
+            value: cjonvel
+          - name: GIT_USER_EMAIL
+            value: coralie.jonvel@fr.ibm.com
         workspaces:
           - name: pipeline-shared-data
             persistentVolumeClaim:
               claimName: nextapp-pipeline    # this PVC must already exist
+          - name: github-credentials
+            secret:
+              secretName: github-credentials
+    - apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: build-bot
+      secrets:
+        - name: ibmcloud-cr-credentials
+        - name: github-credentials
+    - kind: Secret
+      apiVersion: v1
+      metadata:
+        name: ibmcloud-cr-credentials
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: $(tt.params.one-pipeline-dockerconfigjson)
+    - kind: Secret
+      apiVersion: v1
+      metadata:
+        name: github-credentials
+        annotations:
+          tekton.dev/git-0: github.com
+      type: kubernetes.io/ssh-auth
+      data:
+        ssh-privatekey: $(tt.params.git-ssh-key)
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
@@ -110,16 +90,3 @@ spec:
   params:
     - name: source-repo
       value: $(body.repository.ssh_url)
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: webhook-receiver
-spec:
-  to:
-    kind: Service
-    name: el-webhook-receiver
-    weight: 100
-  port:
-    targetPort: http-listener
-  wildcardPolicy: None
