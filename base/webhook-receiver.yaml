@@ -31,7 +31,6 @@ spec:
       description: git username for commit
     - name: git-email
       description: git email for commit
-    - name: test-value
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
@@ -49,7 +48,7 @@ spec:
           - name: source-repo-branch
             value:  $(tt.params.source-repo-branch)    #  Will be filled by git event thanks to TriggerBinding mapping
           - name: image-registry
-            value: $(tt.params.test-value)
+            value: $(tt.params.image-registry)
           - name: GIT_CONFIG_REPO
             value: $(tt.params.git-config-repo)   
           - name: GIT_USER_NAME
