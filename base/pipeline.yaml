@@ -22,8 +22,6 @@ spec:
       type: string
     - name: GIT_USER_EMAIL
       type: string
-    - name: test-value
-      type: string
   workspaces:
     - name: pipeline-shared-data
     - name: github-credentials
@@ -34,8 +32,6 @@ spec:
           value: "$(params.source-repo)"
         - name: revision
           value: "$(params.source-repo-branch)"
-        - name: test-value
-          value: "$(params.test-value)"
       taskRef:
         name: git-clone
       workspaces:
