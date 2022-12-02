@@ -35,7 +35,7 @@ spec:
         - name: revision
           value: "$(params.source-repo-branch)"
         - name: test-value
-          value: "$(params.source-test-value)"
+          value: "$(params.test-value)"
       taskRef:
         name: git-clone
       workspaces:
