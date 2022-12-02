@@ -31,6 +31,7 @@ spec:
       description: git username for commit
     - name: git-email
       description: git email for commit
+    - name: test-value
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
@@ -55,6 +56,8 @@ spec:
             value: $(tt.params.git-username)
           - name: GIT_USER_EMAIL
             value: $(tt.params.git-email)
+          - name: test-value
+            value: $(tt.params.test-value)
         workspaces:
           - name: pipeline-shared-data
             persistentVolumeClaim:
